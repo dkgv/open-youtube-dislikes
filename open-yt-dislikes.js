@@ -1,15 +1,18 @@
-console.log("open-yt-dislikes.js! " + new Date());
-
 const dislikeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2) > a:nth-child(1)';
 let hasDislikedVideo = false;
 
-window.onload = function() {
+window.addEventListener('yt-navigate-finish', initialize, true);
+
+function initialize() {
+    console.log('Initializing open-youtube-dislikes...'); 
     registerVideo();
     hookDislikeButton();
     injectDislikes();
-};
+}
 
 function registerVideo() {
+    console.log('Registering video');
+
     let payload = buildVideoPayload();
     let videoID = payload['id'];
     sendRequest('/video/' + videoID, 'POST', payload, function(response) {
@@ -22,6 +25,8 @@ function registerVideo() {
 }
 
 function injectDislikes() {
+    console.log('Injecting dislikes');
+
     let payload = buildVideoPayload();
     let videoID = payload['id'];
     sendRequest('/video/' + videoID + '/dislikes', 'GET', payload, function(response) {
@@ -39,9 +44,11 @@ function injectDislikes() {
 }
 
 function hookDislikeButton() {
+    console.log('Hooking dislike button');
+
     let dislikeButton = document.querySelector(dislikeButtonPath);
     if (!dislikeButton) {
-        console.log("No dislike button found");
+        console.log('No dislike button found');
     }
 
     dislikeButton.addEventListener('click', function(e) {
@@ -56,12 +63,13 @@ function hookDislikeButton() {
         }
 
         hasDislikedVideo = !hasDislikedVideo;
-        sendRequest(endpoint, 'POST', {}, function(response) {});
+        sendRequest(endpoint, 'POST', {}, () => { });
     });
 }
 
 async function sendRequest(endpoint, method, body, callback) {
     let url = getAPIUrl(endpoint);
+    console.debug('Submitting ' + method + ' request to ' + url);
     const response = await fetch(url, {
         method: method,
         body: body,
