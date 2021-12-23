@@ -1,0 +1,16 @@
+{
+    "description": "Restores YouTube dislikes for all videos, powered by machine learning.",
+    "manifest_version": 2,
+    "name": "Open YouTube Dislikes",
+    "version": "1.0",
+    "homepage_url": "https://github.com/dkgv/open-yt-dislikes",
+    "icons": {
+        "48": "icons/icon-48.png"
+    },
+    "content_scripts": [
+        {
+            "matches": ["*://*.youtube.com/watch?*"],
+            "js": ["open-yt-dislikes.js"]
+        }
+    ]
+}
