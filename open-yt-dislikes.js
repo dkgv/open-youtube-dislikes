@@ -12,7 +12,13 @@ window.onload = function() {
 function registerVideo() {
     let payload = buildVideoPayload();
     let videoID = payload['id'];
-    sendRequest('/video/' + videoID, 'POST', payload, function(response) { });
+    sendRequest('/video/' + videoID, 'POST', payload, function(response) {
+        if (response.status != 200) {
+            return;
+        }
+
+        hasDislikedVideo = response.json().has_disliked;
+    });
 }
 
 function injectDislikes() {
@@ -49,6 +55,7 @@ function hookDislikeButton() {
             endpoint += '/dislike';
         }
 
+        hasDislikedVideo = !hasDislikedVideo;
         sendRequest(endpoint, 'POST', {}, function(response) {});
     });
 }
