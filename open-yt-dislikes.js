@@ -1,35 +1,48 @@
-const dislikeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2) > a:nth-child(1)';
+const dislikeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2)';
+
+let hasLikedVideo = false;
 let hasDislikedVideo = false;
+let isExtensionInitialized = false;
 
 window.addEventListener('yt-navigate-finish', initialize, true);
+let initializer = setInterval(initialize, 200);
 
-function initialize() {
-    console.log('Initializing open-youtube-dislikes...'); 
-    registerVideo();
+async function initialize() {
+    if (isExtensionInitialized || isVideoLoading()) {
+        return;
+    }
+
+    console.log('Initializing open-youtube-dislikes...');
+    await registerVideo();
+    hookLikeButton();
     hookDislikeButton();
-    injectDislikes();
+    await injectDislikes();
+
+    isExtensionInitialized = true;
+    clearInterval(initializer);
 }
 
-function registerVideo() {
+async function registerVideo() {
     console.log('Registering video');
 
-    let payload = buildVideoPayload();
+    let payload = await buildVideoPayload();
     let videoID = payload['id'];
-    sendRequest('/video/' + videoID, 'POST', payload, function(response) {
+    sendRequest('/video/' + videoID + '/watch', 'POST', payload, function(response) {
         if (response.status != 200) {
             return;
         }
 
         hasDislikedVideo = response.json().has_disliked;
+        hasLikedVideo = response.json().has_liked;
     });
 }
 
-function injectDislikes() {
+async function injectDislikes() {
     console.log('Injecting dislikes');
 
-    let payload = buildVideoPayload();
+    let payload = await buildVideoPayload();
     let videoID = payload['id'];
-    sendRequest('/video/' + videoID + '/dislikes', 'GET', payload, function(response) {
+    sendRequest('/video/' + videoID, 'GET', payload, function(response) {
         if (response.status != 200) {
             return;
         }
@@ -43,41 +56,64 @@ function injectDislikes() {
     });
 }
 
+function hookLikeButton() {
+    console.log('Hooking like button');
+
+    const likeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(1)';
+    hookButton(likeButtonPath, function(e) {
+        e.preventDefault();
+        let videoID = extractVideoID();
+        sendRequest('/video/' + videoID + '/like', 'POST', {
+            'action': determineAction(hasLikedVideo)
+        }, () => { });
+        hasLikedVideo = !hasLikedVideo;
+    });
+}
+
 function hookDislikeButton() {
     console.log('Hooking dislike button');
 
-    let dislikeButton = document.querySelector(dislikeButtonPath);
-    if (!dislikeButton) {
-        console.log('No dislike button found');
+    hookButton(dislikeButtonPath, function(e) {
+        e.preventDefault();
+        let videoID = extractVideoID();
+        sendRequest('/video/' + videoID + '/dislike', 'POST', {
+            'action': determineAction(hasDislikedVideo)
+        }, () => { });
+        hasDislikedVideo = !hasDislikedVideo;
+    });
+}
+
+function determineAction(bool) {
+    return bool ? 'remove' : 'add';
+}
+
+function hookButton(buttonPath, callback) {
+    let button = document.querySelector(buttonPath);
+    if (!button) {
+        return;
     }
 
-    dislikeButton.addEventListener('click', function(e) {
-        e.preventDefault();
-
-        let videoID = extractVideoID();
-        let endpoint = '/video/' + videoID;
-        if (hasDislikedVideo) {
-            endpoint += '/undislike';
-        } else {
-            endpoint += '/dislike';
-        }
-
-        hasDislikedVideo = !hasDislikedVideo;
-        sendRequest(endpoint, 'POST', {}, () => { });
-    });
+    button.addEventListener('click', callback);
 }
 
 async function sendRequest(endpoint, method, body, callback) {
     let url = getAPIUrl(endpoint);
-    console.debug('Submitting ' + method + ' request to ' + url);
+    let userID = getUserID();
+    console.debug('Submitting ' + method + ' request to ' + url + ' with body ' + JSON.stringify(body) + ' and user ID ' + userID);
     const response = await fetch(url, {
         method: method,
         body: body,
         headers: {
-            'X-User-ID': getUserID()
+            'X-User-ID': userID
         }
     });
     callback(response);
+}
+
+function isVideoLoading() {
+    let videoID = extractVideoID();
+    const videoPath = 'ytd-watch-flexy[video-id="' + videoID + '"]';
+    return document.querySelector(videoPath) == null;
 }
 
 function getUserID() {
@@ -107,9 +143,9 @@ function getAPIUrl(endpoint) {
     return 'https://gustavvy.com/api/v1' + endpoint;
 }
 
-function buildVideoPayload() {
+async function buildVideoPayload() {
     let videoID = extractVideoID();
-    let hashedVideoID = hashVideoID(videoID);
+    let hashedVideoID = await hashVideoID(videoID);
     let viewCount = extractViewCount();
     let likeCount = extractLikeCount();
     let commentCount = extractCommentCount();
@@ -127,9 +163,10 @@ function buildVideoPayload() {
     };
 }
 
-function hashVideoID(videoID) {
+async function hashVideoID(videoID) {
     const array = new TextEncoder().encode(videoID);
-    return window.crypto.subtle.digest('SHA-256', array);
+    let digest = await window.crypto.subtle.digest('SHA-256', array);
+    return Array.from(new Uint8Array(digest), x => ('00' + x.toString(16)).slice(-2)).join('');
 }
 
 function extractSubscriberCount() {
