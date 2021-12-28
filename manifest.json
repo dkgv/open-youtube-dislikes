@@ -12,5 +12,9 @@
             "matches": ["*://*.youtube.com/watch?*"],
             "js": ["open-yt-dislikes.js"]
         }
+    ],
+    "permissions": [
+        "*://gustavvy.com/*",
+        "webRequest"
     ]
 }

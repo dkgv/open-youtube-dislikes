@@ -1,11 +1,10 @@
-const dislikeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2)';
-
 let hasLikedVideo = false;
 let hasDislikedVideo = false;
 let isExtensionInitialized = false;
+let videoResponse = null;
 
-window.addEventListener('yt-navigate-finish', initialize, true);
-let initializer = setInterval(initialize, 200);
+window.addEventListener('yt-navigate-finish', async () => await initialize(), true);
+let initializer = setInterval(async () => await initialize(), 500);
 
 async function initialize() {
     if (isExtensionInitialized || isVideoLoading()) {
@@ -13,47 +12,42 @@ async function initialize() {
     }
 
     console.log('Initializing open-youtube-dislikes...');
-    await registerVideo();
+    await injectDislikes();
     hookLikeButton();
     hookDislikeButton();
-    await injectDislikes();
 
     isExtensionInitialized = true;
     clearInterval(initializer);
-}
-
-async function registerVideo() {
-    console.log('Registering video');
-
-    let payload = await buildVideoPayload();
-    let videoID = payload['id'];
-    sendRequest('/video/' + videoID + '/watch', 'POST', payload, function(response) {
-        if (response.status != 200) {
-            return;
-        }
-
-        hasDislikedVideo = response.json().has_disliked;
-        hasLikedVideo = response.json().has_liked;
-    });
 }
 
 async function injectDislikes() {
     console.log('Injecting dislikes');
 
     let payload = await buildVideoPayload();
-    let videoID = payload['id'];
-    sendRequest('/video/' + videoID, 'GET', payload, function(response) {
-        if (response.status != 200) {
+    let videoID = extractVideoID();
+    sendRequest('/video/' + videoID, 'POST', payload, function(xhr) {
+        if (xhr.status != 200) {
+            console.error('Failed to fetch video with status ' + xhr.status);
             return;
         }
 
-        let dislikeButton = document.querySelector(dislikeButtonPath);
-        if (!dislikeButton) {
-            return;
-        }
+        videoResponse = JSON.parse(xhr.response);
+        
+        hasDislikedVideo = videoResponse.hasDisliked;
+        hasLikedVideo = videoResponse.hasLiked;
 
-        dislikeButton.innerText = response.json().dislikes;
+        setDislikeCount(videoResponse.formattedDislikes);
     });
+}
+
+function setDislikeCount(count) {
+    const dislikeButtonTextPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2) > a:nth-child(1) > yt-formatted-string:nth-child(2)';
+    let dislikeButton = document.querySelector(dislikeButtonTextPath);
+    if (!dislikeButton) {
+        return;
+    }
+
+    dislikeButton.innerText = count;
 }
 
 function hookLikeButton() {
@@ -62,10 +56,10 @@ function hookLikeButton() {
     const likeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(1)';
     hookButton(likeButtonPath, function(e) {
         e.preventDefault();
+
         let videoID = extractVideoID();
-        sendRequest('/video/' + videoID + '/like', 'POST', {
-            'action': determineAction(hasLikedVideo)
-        }, () => { });
+        sendRequest('/video/' + videoID + '/like', 'POST', determineAction(hasLikedVideo), () => { });
+
         hasLikedVideo = !hasLikedVideo;
     });
 }
@@ -73,13 +67,27 @@ function hookLikeButton() {
 function hookDislikeButton() {
     console.log('Hooking dislike button');
 
+    const dislikeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2)';
     hookButton(dislikeButtonPath, function(e) {
         e.preventDefault();
+
         let videoID = extractVideoID();
-        sendRequest('/video/' + videoID + '/dislike', 'POST', {
-            'action': determineAction(hasDislikedVideo)
-        }, () => { });
+        sendRequest('/video/' + videoID + '/dislike', 'POST',  determineAction(hasDislikedVideo), () => { });
+
         hasDislikedVideo = !hasDislikedVideo;
+
+        if (videoResponse.formattedDislikes.indexOf('K') > -1 ||videoResponse.formattedDislikes.indexOf('M') > -1) {
+            return;
+        }
+
+        if (hasDislikedVideo) {
+            videoResponse.dislikes++;
+        } else {
+            videoResponse.dislikes--;
+        }
+
+        videoResponse.formattedDislikes = '' + videoResponse.dislikes;
+        setDislikeCount(videoResponse.formattedDislikes);
     });
 }
 
@@ -96,18 +104,20 @@ function hookButton(buttonPath, callback) {
     button.addEventListener('click', callback);
 }
 
-async function sendRequest(endpoint, method, body, callback) {
+function sendRequest(endpoint, method, body, callback) {
     let url = getAPIUrl(endpoint);
     let userID = getUserID();
     console.debug('Submitting ' + method + ' request to ' + url + ' with body ' + JSON.stringify(body) + ' and user ID ' + userID);
-    const response = await fetch(url, {
-        method: method,
-        body: body,
-        headers: {
-            'X-User-ID': userID
-        }
-    });
-    callback(response);
+
+    let xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('X-User-ID', userID);
+    xhr.onload = function() {
+        console.log(xhr.status);
+        callback(xhr);  
+    };
+    xhr.send(JSON.stringify(body));
 }
 
 function isVideoLoading() {
@@ -117,7 +127,7 @@ function isVideoLoading() {
 }
 
 function getUserID() {
-    const key = 'open_yt_dislikes_user_id';
+    const key = 'open_youtube_dislikes_user_id';
     let userID = localStorage.getItem(key);
     if (userID) {
         return userID;
@@ -140,7 +150,7 @@ function generateUUID(){
 }
 
 function getAPIUrl(endpoint) {
-    return 'https://gustavvy.com/api/v1' + endpoint;
+    return 'https://gustavvy.com' + endpoint;
 }
 
 async function buildVideoPayload() {
@@ -154,12 +164,12 @@ async function buildVideoPayload() {
 
     return {
         'id': videoID,
-        'id_hash': hashedVideoID,
+        'idHash': hashedVideoID,
         'views': viewCount,
         'likes': likeCount,
         'comments': commentCount,
         'subscribers': subscriberCount,
-        'published_at': publishedAt
+        'publishedAt': publishedAt
     };
 }
 
@@ -176,22 +186,18 @@ function extractSubscriberCount() {
         return -1;
     }
 
-    let subscriberCountString = subscriberCount.getAttribute('aria-label');
-    let subscribersIndex = subscriberCountString.indexOf(' subscribers');
-    if (subscribersIndex > -1) {
-        subscriberCountString = subscriberCountString.substring(0, subscribersIndex);
-    }
+    let subscriberCountString = subscriberCount.getAttribute('aria-label').toLowerCase();
 
     let modifier = 1;
-    if (subscriberCountString.indexOf('K') > -1) {
+    if (subscriberCountString.indexOf('k') > -1) {
         modifier = 1000;
     }
 
-    if (subscriberCountString.indexOf('M') > -1) {
+    if (subscriberCountString.indexOf('million') > -1) {
         modifier = 1000000;
     }
 
-    let count = Number(subscriberCountString.replace(/[MK]/g, ''));
+    let count = Number(subscriberCountString.replace(/[milonksubcre]/g, ''));
     return count * modifier;
 }
 
