@@ -36,18 +36,48 @@ async function injectDislikes() {
         hasDislikedVideo = videoResponse.hasDisliked;
         hasLikedVideo = videoResponse.hasLiked;
 
-        setDislikeCount(videoResponse.formattedDislikes);
+        refreshDislikeCount();
     });
 }
 
-function setDislikeCount(count) {
+function refreshDislikeCount() {
+    if (!videoResponse) {
+        console.error('No video response available to refresh dislike count');
+        return;
+    }
+
     const dislikeButtonTextPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2) > a:nth-child(1) > yt-formatted-string:nth-child(2)';
     let dislikeButton = document.querySelector(dislikeButtonTextPath);
     if (!dislikeButton) {
         return;
     }
 
-    dislikeButton.innerText = count;
+    dislikeButton.innerText = videoResponse.formattedDislikes;
+
+    let container = document.getElementById('menu-container');
+    if (!container) {
+        return;
+    }
+
+    let width = 0.5;
+    let likes = extractLikeCount();
+    let dislikes = videoResponse.dislikes;
+    if (likes + dislikes > 0) {
+        width = likes / (likes + dislikes);
+    }
+    width *= 100;
+
+    let rateBarElement = document.getElementById('rate-bar');
+    if (!rateBarElement) {
+        const rateBarHTML = `
+        <div style='height: 2px; margin-left: 7px; width: 140px; background: var(--yt-spec-icon-disabled);'>
+            <div id='rate-bar' style='width: ${width}%; height: 100%; border-radius: 2px; background: var(--yt-spec-text-primary);'></div>
+        </div>
+        `;
+        container.insertAdjacentHTML('beforeend', rateBarHTML);
+    } else {
+        rateBarElement.style.width = width + '%';
+    }
 }
 
 function hookLikeButton() {
@@ -87,7 +117,7 @@ function hookDislikeButton() {
         }
 
         videoResponse.formattedDislikes = '' + videoResponse.dislikes;
-        setDislikeCount(videoResponse.formattedDislikes);
+        refreshDislikeCount();
     });
 }
 
