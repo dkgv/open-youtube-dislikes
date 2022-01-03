@@ -1,23 +1,25 @@
 let hasLikedVideo = false;
 let hasDislikedVideo = false;
-let isExtensionInitialized = false;
 let videoResponse = null;
 
 window.addEventListener('yt-navigate-finish', async () => await initialize(), true);
 let initializer = setInterval(async () => await initialize(), 500);
 
 async function initialize() {
-    if (isExtensionInitialized || isVideoLoading()) {
-        return;
+    let timeout = 0;
+    if (isVideoLoading()) {
+        timeout = 500;
     }
 
-    console.log('Initializing open-youtube-dislikes...');
-    await injectDislikes();
-    hookLikeButton();
-    hookDislikeButton();
+    setTimeout(async () => {
+        console.log('Initializing open-youtube-dislikes...');
+        
+        await injectDislikes();
+        hookLikeButton();
+        hookDislikeButton();
 
-    isExtensionInitialized = true;
-    clearInterval(initializer);
+        clearInterval(initializer);
+    }, timeout);
 }
 
 async function injectDislikes() {
