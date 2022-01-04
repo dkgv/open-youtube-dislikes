@@ -1,11 +1,18 @@
 let hasLikedVideo = false;
 let hasDislikedVideo = false;
 let videoResponse = null;
+let initializing = false;
 
 window.addEventListener('yt-navigate-finish', async () => await initialize(), true);
-let initializer = setInterval(async () => await initialize(), 500);
+let initializer = setInterval(async () => await initialize(), 1000);
 
 async function initialize() {
+    if (initializing) {
+        return;
+    }
+
+    initializing = true;
+
     let timeout = 0;
     if (isVideoLoading()) {
         timeout = 500;
@@ -18,6 +25,7 @@ async function initialize() {
         hookLikeButton();
         hookDislikeButton();
 
+        initializing = false;
         clearInterval(initializer);
     }, timeout);
 }
@@ -27,17 +35,15 @@ async function injectDislikes() {
 
     let payload = await buildVideoPayload();
     let videoID = extractVideoID();
-    sendRequest('/video/' + videoID, 'POST', payload, function(xhr) {
-        if (xhr.status != 200) {
-            console.error('Failed to fetch video with status ' + xhr.status);
-            return;
-        }
-
-        videoResponse = JSON.parse(xhr.response);
-        
-        hasDislikedVideo = videoResponse.hasDisliked;
-        hasLikedVideo = videoResponse.hasLiked;
-
+    // eslint-disable-next-line no-undef
+    getBrowserHandle().runtime.sendMessage({
+        'message': 'video',
+        'payload': payload,
+        'videoID': videoID,
+    }, response => {
+        videoResponse = response;
+        hasLikedVideo = response.hasLikedVideo;
+        hasDislikedVideo = response.hasDislikedVideo;
         refreshDislikeCount();
     });
 }
@@ -90,8 +96,14 @@ function hookLikeButton() {
         e.preventDefault();
 
         let videoID = extractVideoID();
-        sendRequest('/video/' + videoID + '/like', 'POST', determineAction(hasLikedVideo), () => { });
-
+        let action = determineVoteAction(hasLikedVideo);
+        // eslint-disable-next-line no-undef
+        getBrowserHandle().runtime.sendMessage({
+            'message': 'like_video',
+            'action': action,
+            'videoID': videoID
+        });
+        
         hasLikedVideo = !hasLikedVideo;
     });
 }
@@ -104,7 +116,13 @@ function hookDislikeButton() {
         e.preventDefault();
 
         let videoID = extractVideoID();
-        sendRequest('/video/' + videoID + '/dislike', 'POST',  determineAction(hasDislikedVideo), () => { });
+        let action = determineVoteAction(hasDislikedVideo);
+        // eslint-disable-next-line no-undef
+        getBrowserHandle().runtime.sendMessage({
+            'message': 'dislike_video',
+            'action': action,
+            'videoID': videoID
+        });
 
         hasDislikedVideo = !hasDislikedVideo;
 
@@ -123,7 +141,7 @@ function hookDislikeButton() {
     });
 }
 
-function determineAction(bool) {
+function determineVoteAction(bool) {
     return bool ? 'remove' : 'add';
 }
 
@@ -136,53 +154,10 @@ function hookButton(buttonPath, callback) {
     button.addEventListener('click', callback);
 }
 
-function sendRequest(endpoint, method, body, callback) {
-    let url = getAPIUrl(endpoint);
-    let userID = getUserID();
-    console.debug('Submitting ' + method + ' request to ' + url + ' with body ' + JSON.stringify(body) + ' and user ID ' + userID);
-
-    let xhr = new XMLHttpRequest();
-    xhr.open(method, url, true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('X-User-ID', userID);
-    xhr.onload = function() {
-        console.log(xhr.status);
-        callback(xhr);  
-    };
-    xhr.send(JSON.stringify(body));
-}
-
 function isVideoLoading() {
     let videoID = extractVideoID();
     const videoPath = 'ytd-watch-flexy[video-id="' + videoID + '"]';
     return document.querySelector(videoPath) == null;
-}
-
-function getUserID() {
-    const key = 'open_youtube_dislikes_user_id';
-    let userID = localStorage.getItem(key);
-    if (userID) {
-        return userID;
-    }
-
-    let uuid = generateUUID();
-    localStorage.setItem(key, uuid);
-    return uuid;
-}
-
-// https://gist.github.com/jsmithdev/1f31f9f3912d40f6b60bdc7e8098ee9f
-function generateUUID(){
-    let dt = new Date().getTime()    
-    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = (dt + Math.random()*16)%16 | 0
-        dt = Math.floor(dt/16)
-        return (c=='x' ? r :(r&0x3|0x8)).toString(16)
-    })
-    return uuid
-}
-
-function getAPIUrl(endpoint) {
-    return 'https://gustavvy.com' + endpoint;
 }
 
 async function buildVideoPayload() {
