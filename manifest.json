@@ -14,8 +14,7 @@
         }
     ],
     "permissions": [
-        "*://gustavvy.com/*",
-        "webRequest"
+        "*://gustavvy.com/*"
     ],
     "background": {
         "scripts": ["helpers.js", "background.js"]
