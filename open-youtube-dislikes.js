@@ -56,12 +56,12 @@ function refreshDislikeCount() {
     }
 
     const dislikeButtonTextPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2) > a:nth-child(1) > yt-formatted-string:nth-child(2)';
-    let dislikeButton = document.querySelector(dislikeButtonTextPath);
-    if (!dislikeButton) {
+    let dislikeButtonText = document.querySelector(dislikeButtonTextPath);
+    if (!dislikeButtonText) {
         return;
     }
 
-    dislikeButton.innerText = videoResponse.formattedDislikes;
+    dislikeButtonText.innerText = videoResponse.formattedDislikes;
 
     let container = document.getElementById('menu-container');
     if (!container) {
@@ -76,10 +76,11 @@ function refreshDislikeCount() {
     }
     width *= 100;
 
+    let containerWidth = 140;
     let rateBarElement = document.getElementById('rate-bar');
     if (!rateBarElement) {
         const rateBarHTML = `
-        <div style='height: 2px; margin-left: 7px; width: 140px; background: var(--yt-spec-icon-disabled);'>
+        <div style='height: 2px; margin-left: 6px; width: ${containerWidth}px; background: var(--yt-spec-icon-disabled);'>
             <div id='rate-bar' style='width: ${width}%; height: 100%; border-radius: 2px; background: var(--yt-spec-text-primary);'></div>
         </div>
         `;
@@ -92,10 +93,12 @@ function refreshDislikeCount() {
 function hookLikeButton() {
     console.log('Hooking like button');
 
-    const likeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(1)';
-    hookButton(likeButtonPath, function(e) {
-        e.preventDefault();
+    let likeButton = getLikeButton();
+    if (!likeButton) {
+        return;
+    }
 
+    likeButton.addEventListener('click', function() {
         let videoID = extractVideoID();
         let action = determineVoteAction(hasLikedVideo);
         // eslint-disable-next-line no-undef
@@ -112,8 +115,12 @@ function hookLikeButton() {
 function hookDislikeButton() {
     console.log('Hooking dislike button');
 
-    const dislikeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2)';
-    hookButton(dislikeButtonPath, function(e) {
+    let dislikeButton = getDislikeButton();
+    if (!dislikeButton) {
+        return;
+    }
+
+    dislikeButton.addEventListener('click', function(e) {
         e.preventDefault();
 
         let videoID = extractVideoID();
@@ -146,13 +153,14 @@ function determineVoteAction(bool) {
     return bool ? 'remove' : 'add';
 }
 
-function hookButton(buttonPath, callback) {
-    let button = document.querySelector(buttonPath);
-    if (!button) {
-        return;
-    }
+function getDislikeButton() {
+    const dislikeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(2)';
+    return document.querySelector(dislikeButtonPath);
+}
 
-    button.addEventListener('click', callback);
+function getLikeButton() {
+    const likeButtonPath = 'ytd-toggle-button-renderer.style-scope:nth-child(1)';
+    return document.querySelector(likeButtonPath);
 }
 
 function isVideoLoading() {
