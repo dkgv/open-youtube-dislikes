@@ -8,6 +8,7 @@ let initializer = setInterval(async () => await initialize(), 1000);
 
 async function initialize() {
     if (initializing) {
+        console.debug('Already initializing');
         return;
     }
 
@@ -225,11 +226,14 @@ function extractPublishedAt() {
         return null;
     }
 
-    // Parse date format "Dec 10, 2020"
-    let dateString = publishedDate.innerText;
-    let date = new Date(dateString);
+    // Get full date, e.g. "Started streaming on May 15, 2020"
+    let fullDateString = publishedDate.innerText;
 
-    // Convert date to millis
+    // Only keep last 12 chars, e.g. "May 15, 2020"
+    let dateString = fullDateString.substring(fullDateString.length - 12, fullDateString.length);
+
+    // Parse date format "Dec 10, 2020" and convert to millis
+    let date = new Date(dateString);
     return date.getTime();
 }
 
@@ -260,6 +264,11 @@ function extractViewCount() {
     let viewsIndex = viewCountString.indexOf(' views');
     if (viewsIndex > -1) {
         viewCountString = viewCountString.substring(0, viewsIndex);
+    }
+
+    // Video is a live stream
+    if (viewCountString.indexOf('watching') >= 0) {
+        return -1;
     }
 
     return Number(viewCountString.replace(/,/g, ''));
