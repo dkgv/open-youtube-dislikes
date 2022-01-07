@@ -2,7 +2,7 @@
     "description": "Returns YouTube dislikes for all videos, powered by archived data and machine learning.",
     "manifest_version": 2,
     "name": "Open YouTube Dislikes",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "homepage_url": "https://github.com/dkgv/open-youtube-dislikes",
     "icons": {
         "48": "icons/icon-48.png"

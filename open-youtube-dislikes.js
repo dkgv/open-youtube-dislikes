@@ -7,6 +7,10 @@ window.addEventListener('yt-navigate-finish', async () => await initialize(), tr
 let initializer = setInterval(async () => await initialize(), 1000);
 
 async function initialize() {
+    if (window.location.href.indexOf('watch') == -1) {
+        return;
+    }
+
     if (initializing) {
         console.debug('Already initializing');
         return;
@@ -205,8 +209,13 @@ function extractSubscriberCount() {
         return -1;
     }
 
-    let subscriberCountString = subscriberCount.getAttribute('aria-label').toLowerCase();
-    var trimmedSubscriberString = '';
+    let subscriberCountString = subscriberCount.getAttribute('aria-label');
+    if (!subscriberCountString) {
+        return -1;
+    }
+    
+    subscriberCountString = subscriberCountString.toLowerCase()
+    let trimmedSubscriberString = '';
     for (let i = 0; i < subscriberCountString.length; i++) {
         let isNumber = subscriberCountString[i] >= '0' && subscriberCountString[i] <= '9';
         let isSeparator = subscriberCountString[i] == ',' || subscriberCountString[i] == '.';
