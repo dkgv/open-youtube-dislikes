@@ -61,7 +61,9 @@ function refreshDislikeCount() {
         return;
     }
 
-    dislikeButtonText.innerText = videoResponse.formattedDislikes;
+    if (videoResponse.formattedDislikes) {
+        dislikeButtonText.innerText = videoResponse.formattedDislikes;
+    }
 
     let container = document.getElementById('menu-container');
     if (!container) {
@@ -178,7 +180,7 @@ async function buildVideoPayload() {
     let subscriberCount = extractSubscriberCount();
     let publishedAt = extractPublishedAt();
 
-    return {
+    let payload = {
         'id': videoID,
         'idHash': hashedVideoID,
         'views': viewCount,
@@ -187,6 +189,7 @@ async function buildVideoPayload() {
         'subscribers': subscriberCount,
         'publishedAt': publishedAt
     };
+    return payload;
 }
 
 async function hashVideoID(videoID) {
@@ -203,17 +206,26 @@ function extractSubscriberCount() {
     }
 
     let subscriberCountString = subscriberCount.getAttribute('aria-label').toLowerCase();
+    var trimmedSubscriberString = '';
+    for (let i = 0; i < subscriberCountString.length; i++) {
+        let isNumber = subscriberCountString[i] >= '0' && subscriberCountString[i] <= '9';
+        let isSeparator = subscriberCountString[i] == ',' || subscriberCountString[i] == '.';
+        if (!isNumber && !isSeparator) {
+            break;
+        }
+        trimmedSubscriberString += subscriberCountString[i];
+    }
 
     let modifier = 1;
     if (subscriberCountString.indexOf('k') > -1) {
         modifier = 1000;
     }
 
-    if (subscriberCountString.indexOf('million') > -1) {
+    if (subscriberCountString.indexOf('m') > -1) {
         modifier = 1000000;
     }
 
-    let count = Number(subscriberCountString.replace(/[milonksubcre]/g, ''));
+    let count = Number(trimmedSubscriberString.replace(',', '.'));
     return count * modifier;
 }
 
@@ -234,14 +246,23 @@ function extractPublishedAt() {
         return null;
     }
 
-    // Get full date, e.g. "Started streaming on May 15, 2020"
-    let fullDateString = publishedDate.innerText;
+    // Get full date description, e.g. "Started streaming on May 15, 2020"
+    let fullDateString = publishedDate.innerText.toLowerCase();
 
-    // Only keep last 12 chars, e.g. "May 15, 2020"
-    let dateString = fullDateString.substring(fullDateString.length - 12, fullDateString.length);
+    // Extract relevant parts of the date string
+    const monthRegex = /(jan|feb|mar|apr|may|jun|jul|aug|sep|o(k|c)t|nov|dec)/i;
+    const dayRegex = /\d{1,2}/;
+    const yearRegex = /\d{4}/;
+    const englishRegex = new RegExp(`${monthRegex.source} ${dayRegex.source}, ${yearRegex.source}$`);
+    const globalRegex = new RegExp(`${dayRegex.source}. ${monthRegex.source}. ${yearRegex.source}$`);
+    const regex = new RegExp(`${englishRegex.source}|${globalRegex.source}`);
+    let match = fullDateString.match(regex);
+    if (match) {
+        match = match[0].replace(/(,|\.)/g, '');
+    }
 
-    // Parse date format "Dec 10, 2020" and convert to millis
-    let date = new Date(dateString);
+    // Parse to date object and convert to millis
+    let date = new Date(match);
     return date.getTime();
 }
 
@@ -253,12 +274,7 @@ function extractLikeCount() {
     }
 
     let likeCountString = likeCount.getAttribute('aria-label');
-    let likesIndex = likeCountString.indexOf(' likes');
-    if (likesIndex > -1) {
-        likeCountString = likeCountString.substring(0, likesIndex);
-    }
-
-    return Number(likeCountString.replace(/,/g, ''));
+    return Number(likeCountString.replace(/[^0-9]/g, ''));
 }
 
 function extractViewCount() {
@@ -269,17 +285,7 @@ function extractViewCount() {
     }
 
     let viewCountString = viewCount.innerText;
-    let viewsIndex = viewCountString.indexOf(' views');
-    if (viewsIndex > -1) {
-        viewCountString = viewCountString.substring(0, viewsIndex);
-    }
-
-    // Video is a live stream
-    if (viewCountString.indexOf('watching') >= 0) {
-        return -1;
-    }
-
-    return Number(viewCountString.replace(/,/g, ''));
+    return Number(viewCountString.replace(/[^0-9]/g, ''));
 }
 
 function extractVideoID() {
