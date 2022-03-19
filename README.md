@@ -9,7 +9,7 @@ Open YouTube Dislikes is a truly open source browser extension created to restor
 
 ## Download
 
-<a href="https://addons.mozilla.org/en-US/firefox/addon/open-youtube-dislikes/"><img src="https://i.imgur.com/ihUptG8.png" alt="Get Open YouTube Dislikes for Firefox" /></a>
+<a href="https://addons.mozilla.org/firefox/addon/open-youtube-dislikes/"><img src="https://i.imgur.com/ihUptG8.png" alt="Get Open YouTube Dislikes for Firefox" /></a>
 <a href="https://chrome.google.com/webstore/detail/open-youtube-dislikes/ncdbokbicfmcagdonblpnggbgelbmcde"><img height="64" src="https://i.imgur.com/OK0mhGN.png" alt="Get Open YouTube Dislikes for Chrome" /></a>
 
 ## How?
